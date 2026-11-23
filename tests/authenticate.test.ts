@@ -1,15 +1,7 @@
+
 import { Request, Response } from "express";
 import authenticate from "../src/api/v1/middleware/authenticate";
 import { auth } from "../config/firebaseConfig";
-import { AuthenticationError } from "../src/api/v1/errors/errors";
-
-// Mock the Firebase config module
-jest.mock("../path/to/firebaseConfig", () => ({
-    // <-- Update path
-    auth: {
-        verifyIdToken: jest.fn(),
-    },
-}));
 
 describe("Authentication Middleware", () => {
     let mockRequest: Partial<Request>;
@@ -17,86 +9,40 @@ describe("Authentication Middleware", () => {
     let nextFunction: jest.Mock;
 
     beforeEach(() => {
-        // Reset mocks between tests
         jest.clearAllMocks();
-
-        // Set up basic mock objects
-        mockRequest = {
-            headers: {},
-        };
-
-        mockResponse = {
-            locals: {},
-        };
-
+        mockRequest = { headers: {} };
+        mockResponse = { locals: {} };
         nextFunction = jest.fn();
     });
 
-    it("should throw AuthenticationError when no token is provided", async () => {
-        // Act & Assert
-        await expect(
-            authenticate(
-                mockRequest as Request,
-                mockResponse as Response,
-                nextFunction
-            )
-        ).rejects.toThrow(AuthenticationError);
-
-        // Verify error properties if needed
-        await expect(
-            authenticate(
-                mockRequest as Request,
-                mockResponse as Response,
-                nextFunction
-            )
-        ).rejects.toMatchObject({
-            message: expect.stringContaining("/* expected error message */"), // <-- e.g. 'No token provided'
-            code: "/* expected error code */", // <-- e.g. 'TOKEN_NOT_FOUND'
-        });
-
-        expect(nextFunction).not.toHaveBeenCalled();
-    });
-
-    it("should throw AuthenticationError when token is invalid", async () => {
+    it("should return TOKEN_NOT_FOUND when token is missing", async () => {
         // Arrange
-        mockRequest.headers = {
-            authorization: "Bearer /* invalid token string */", // <-- e.g. 'invalid-token'
-        };
+        mockRequest.headers = {};
 
-        // Mock the Firebase auth response
-        (auth.verifyIdToken as jest.Mock).mockRejectedValueOnce(
-            new Error("/* firebase error message */") // <-- e.g. 'Firebase Error: Invalid token'
+        // Act
+        await authenticate(
+            mockRequest as Request,
+            mockResponse as Response,
+            nextFunction
         );
 
-        // Act & Assert
-        await expect(
-            authenticate(
-                mockRequest as Request,
-                mockResponse as Response,
-                nextFunction
-            )
-        ).rejects.toThrow(AuthenticationError);
-
-        expect(auth.verifyIdToken).toHaveBeenCalledWith(
-            "/* expected token passed to Firebase */"
-        ); // <-- e.g. 'invalid-token'
-        expect(nextFunction).not.toHaveBeenCalled();
+        // Assert
+        expect(nextFunction).toHaveBeenCalledWith(
+            expect.objectContaining({
+                code: "TOKEN_NOT_FOUND",
+                statusCode: 401,
+            })
+        );
+        expect(auth.verifyIdToken).not.toHaveBeenCalled();
     });
 
-    it("should call next() and set user data when token is valid", async () => {
+    it("should return TOKEN_INVALID when token is invalid", async () => {
         // Arrange
         mockRequest.headers = {
-            authorization: "Bearer /* valid token string */", // <-- e.g. 'valid-token'
+            authorization: "Bearer invalid-token",
         };
-
-        const mockDecodedToken = {
-            uid: "/* user id */", // <-- e.g. 'user123'
-            role: "/* user role */", // <-- e.g. 'admin'
-        };
-
-        // Mock successful token verification
-        (auth.verifyIdToken as jest.Mock).mockResolvedValueOnce(
-            mockDecodedToken
+        (auth.verifyIdToken as jest.Mock).mockRejectedValueOnce(
+            new Error("Invalid token")
         );
 
         // Act
@@ -107,13 +53,55 @@ describe("Authentication Middleware", () => {
         );
 
         // Assert
-        expect(auth.verifyIdToken).toHaveBeenCalledWith(
-            "/* expected token passed to Firebase */"
-        ); // <-- e.g. 'valid-token'
-        expect(mockResponse.locals).toEqual({
-            uid: "/* expected uid */", // <-- e.g. 'user123'
-            role: "/* expected role */", // <-- e.g. 'admin'
+        expect(nextFunction).toHaveBeenCalledWith(
+            expect.objectContaining({
+                code: "TOKEN_INVALID",
+                statusCode: 401,
+            })
+        );
+    });
+
+    it("should store uid when token is valid", async () => {
+        // Arrange
+        mockRequest.headers = {
+            authorization: "Bearer valid-token",
+        };
+        (auth.verifyIdToken as jest.Mock).mockResolvedValueOnce({
+            uid: "user123",
+            role: "admin",
         });
-        expect(nextFunction).toHaveBeenCalled();
+
+        // Act
+        await authenticate(
+            mockRequest as Request,
+            mockResponse as Response,
+            nextFunction
+        );
+
+        // Assert
+        expect(mockResponse.locals?.uid).toBe("user123");
+        expect(nextFunction).toHaveBeenCalledWith();
+    });
+
+    it("should store role when token is valid", async () => {
+        // Arrange
+        mockRequest.headers = {
+            authorization: "Bearer valid-token",
+        };
+        (auth.verifyIdToken as jest.Mock).mockResolvedValueOnce({
+            uid: "user123",
+            role: "lead",
+        });
+
+        // Act
+        await authenticate(
+            mockRequest as Request,
+            mockResponse as Response,
+            nextFunction
+        );
+
+        // Assert
+        expect(mockResponse.locals?.role).toBe("lead");
+        expect(nextFunction).toHaveBeenCalledWith();
     });
 });

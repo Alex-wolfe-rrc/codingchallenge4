@@ -1,7 +1,7 @@
+
 import { Request, Response } from "express";
 import isAuthorized from "../src/api/v1/middleware/authorize";
 import { AuthorizationError } from "../src/api/v1/errors/errors";
-import { AuthorizationOptions } from "../src/api/v1/models/authorizationOptions";
 
 describe("Authorization Middleware", () => {
     let mockRequest: Partial<Request>;
@@ -9,32 +9,16 @@ describe("Authorization Middleware", () => {
     let nextFunction: jest.Mock;
 
     beforeEach(() => {
-        // Reset for each test
-        mockRequest = {
-            params: {},
-        };
-
-        mockResponse = {
-            locals: {},
-        };
-
+        jest.clearAllMocks();
+        mockRequest = { params: {} };
+        mockResponse = { locals: {} };
         nextFunction = jest.fn();
     });
 
-    it("should call next() when user has required role", () => {
+    it("should return ROLE_NOT_FOUND when role is missing", () => {
         // Arrange
-        mockResponse.locals = {
-            uid: "/* user id */", // <-- e.g. 'user123'
-            role: "/* user role with permission */", // <-- e.g. 'admin'
-        };
-
-        const options: AuthorizationOptions = {
-            hasRole: [
-                /* array of allowed roles */
-            ], // <-- e.g. ['admin', 'manager']
-        };
-
-        const middleware = isAuthorized(options);
+        mockResponse.locals = { uid: "user123" };
+        const middleware = isAuthorized({ hasRole: ["admin"] });
 
         // Act
         middleware(
@@ -44,108 +28,21 @@ describe("Authorization Middleware", () => {
         );
 
         // Assert
-        expect(nextFunction).toHaveBeenCalled();
-    });
-
-    it("should throw AuthorizationError when role is missing", () => {
-        // Arrange
-        mockResponse.locals = {
-            uid: "/* user id */", // <-- e.g. 'user123'
-            // No role specified
-        };
-
-        const options: AuthorizationOptions = {
-            hasRole: [
-                /* array of allowed roles */
-            ], // <-- e.g. ['admin']
-        };
-
-        const middleware = isAuthorized(options);
-
-        // Act & Assert
-        expect(() =>
-            middleware(
-                mockRequest as Request,
-                mockResponse as Response,
-                nextFunction
-            )
-        ).toThrow(AuthorizationError);
-
-        expect(() =>
-            middleware(
-                mockRequest as Request,
-                mockResponse as Response,
-                nextFunction
-            )
-        ).toThrow(
+        expect(nextFunction).toHaveBeenCalledWith(
             expect.objectContaining({
-                code: "/* expected error code */", // <-- e.g. 'ROLE_NOT_FOUND'
+                code: "ROLE_NOT_FOUND",
+                statusCode: 403,
             })
         );
-
-        expect(nextFunction).not.toHaveBeenCalled();
     });
 
-    it("should throw AuthorizationError when user has insufficient role", () => {
+    it("should return INSUFFICIENT_ROLE when role is not allowed", () => {
         // Arrange
         mockResponse.locals = {
-            uid: "/* user id */", // <-- e.g. 'user123'
-            role: "/* user role without permission */", // <-- e.g. 'user'
+            uid: "user123",
+            role: "developer",
         };
-
-        const options: AuthorizationOptions = {
-            hasRole: [
-                /* array of required roles */
-            ], // <-- e.g. ['admin']
-        };
-
-        const middleware = isAuthorized(options);
-
-        // Act & Assert
-        expect(() =>
-            middleware(
-                mockRequest as Request,
-                mockResponse as Response,
-                nextFunction
-            )
-        ).toThrow(AuthorizationError);
-
-        expect(() =>
-            middleware(
-                mockRequest as Request,
-                mockResponse as Response,
-                nextFunction
-            )
-        ).toThrow(
-            expect.objectContaining({
-                code: "/* expected error code */", // <-- e.g. 'INSUFFICIENT_ROLE'
-            })
-        );
-
-        expect(nextFunction).not.toHaveBeenCalled();
-    });
-
-    it("should call next() when allowSameUser is true and IDs match", () => {
-        // Arrange
-        const userId = "/* user id */"; // <-- e.g. 'user123'
-
-        mockRequest.params = {
-            id: userId,
-        };
-
-        mockResponse.locals = {
-            uid: userId,
-            role: "/* role that normally wouldn't have access */", // <-- e.g. 'user'
-        };
-
-        const options: AuthorizationOptions = {
-            hasRole: [
-                /* array of roles with higher permission */
-            ], // <-- e.g. ['admin']
-            allowSameUser: true,
-        };
-
-        const middleware = isAuthorized(options);
+        const middleware = isAuthorized({ hasRole: ["admin"] });
 
         // Act
         middleware(
@@ -155,6 +52,51 @@ describe("Authorization Middleware", () => {
         );
 
         // Assert
-        expect(nextFunction).toHaveBeenCalled();
+        expect(nextFunction).toHaveBeenCalledWith(
+            expect.objectContaining({
+                code: "INSUFFICIENT_ROLE",
+                statusCode: 403,
+            })
+        );
+    });
+
+    it("should call next when role is allowed", () => {
+        // Arrange
+        mockResponse.locals = {
+            uid: "user123",
+            role: "admin",
+        };
+        const middleware = isAuthorized({ hasRole: ["admin"] });
+
+        // Act
+        middleware(
+            mockRequest as Request,
+            mockResponse as Response,
+            nextFunction
+        );
+
+        // Assert
+        expect(nextFunction).toHaveBeenCalledWith();
+    });
+
+    it("should allow multiple roles", () => {
+        // Arrange
+        mockResponse.locals = {
+            uid: "user123",
+            role: "lead",
+        };
+        const middleware = isAuthorized({
+            hasRole: ["admin", "lead"],
+        });
+
+        // Act
+        middleware(
+            mockRequest as Request,
+            mockResponse as Response,
+            nextFunction
+        );
+
+        // Assert
+        expect(nextFunction).toHaveBeenCalledWith();
     });
 });
