@@ -1,7 +1,7 @@
-import { Request, Response, NextFunction } from "express";
-import isAuthorized from "../path/to/authorize"; // <-- Update path
-import { AuthorizationError } from "../path/to/errors"; // <-- Update path
-import { AuthorizationOptions } from "../path/to/authorizationOptions"; // <-- Update path
+import { Request, Response } from "express";
+import isAuthorized from "../src/api/v1/middleware/authorize";
+import { AuthorizationError } from "../src/api/v1/errors/errors";
+import { AuthorizationOptions } from "../src/api/v1/models/authorizationOptions";
 
 describe("Authorization Middleware", () => {
     let mockRequest: Partial<Request>;

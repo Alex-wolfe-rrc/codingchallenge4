@@ -38,8 +38,8 @@ export const successResponse = <T>(
 export const errorResponse = (
     message: string,
     code: string
-): ApiResponse<null> => ({
-    status: "error",
+) => ({
+    success: false,
     error: {
         message,
         code

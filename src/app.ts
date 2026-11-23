@@ -7,7 +7,7 @@ import {
     consoleLogger,
 } from "./api/v1/middleware/logger";
 import errorHandler from "./api/v1/middleware/errorHandler";
-import itemRoutes from "./api/v1/routes/itemRoutes";
+import projectRoutes from "./api/v1/routes/projectRoutes";
 // Import the new userRoutes
 import userRoutes from "./api/v1/routes/userRoutes";
 // Import the new adminRoutes
@@ -64,7 +64,7 @@ app.get("/api/v1/health", (req, res) => {
 
 // Route Imports START
 // "/api/v1/items" will prefix all item routes
-app.use("/api/v1/items", itemRoutes);
+app.use("/api/v1/projects", projectRoutes);
 
 // Mount the user routes under /user
 app.use("/api/v1/users", userRoutes);

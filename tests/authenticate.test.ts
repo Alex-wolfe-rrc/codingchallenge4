@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
-import authenticate from "../path/to/authenticate"; // <-- Update path
-import { auth } from "../path/to/firebaseConfig"; // <-- Update path
-import { AuthenticationError } from "../path/to/errors"; // <-- Update path
+import authenticate from "../src/api/v1/middleware/authenticate";
+import { auth } from "../config/firebaseConfig";
+import { AuthenticationError } from "../src/api/v1/errors/errors";
 
 // Mock the Firebase config module
 jest.mock("../path/to/firebaseConfig", () => ({
